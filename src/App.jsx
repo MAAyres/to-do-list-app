@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './index.css';
-import appLogo from './assets/app_icon.png';
 
 // SVG Icons
 const BellIcon = ({ className, style }) => (
@@ -533,7 +532,6 @@ function App() {
     return (
       <>
         <div className="animate-fade-in glass-panel main-panel" style={{maxWidth: '420px', margin: '10vh auto', textAlign: 'center'}}>
-          <img src={appLogo} alt="Mesomo" style={{width: '80px', height: '80px', borderRadius: '20px', marginBottom: '1.5rem', boxShadow: 'var(--shadow-glow)'}} />
           <h1 style={{fontSize: '1.8rem', marginBottom: '0.25rem'}}>Mesomo</h1>
           <p className="subtitle" style={{marginBottom: '2rem'}}>Sign in to manage your tasks</p>
           
@@ -567,10 +565,8 @@ function App() {
     <>
       <div className="animate-fade-in glass-panel main-panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-            <img src={appLogo} alt="Mesomo" style={{width: '48px', height: '48px', borderRadius: '12px'}} />
-            <div>
-              <h1 style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+          <div>
+            <h1 style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
                 Mesomo Task Manager
                 {cloudStatus && (
                   <span 
@@ -582,8 +578,7 @@ function App() {
                   </span>
                 )}
               </h1>
-              <p className="subtitle" style={{marginBottom: 0}}>Manage constraints, components, and clients.</p>
-            </div>
+            <p className="subtitle">Manage constraints, components, and clients.</p>
           </div>
           <div style={{display: 'flex', gap: '0.5rem'}}>
             <button 
