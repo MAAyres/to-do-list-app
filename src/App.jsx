@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import './index.css';
 
 // SVG Icons
-const BellIcon = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className} strokeWidth="2" stroke="currentColor" fill="none">
+const BellIcon = ({ className, style }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className={className} style={style} strokeWidth="2" stroke="currentColor" fill="none">
     <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
   </svg>
 );
@@ -58,9 +58,10 @@ function App() {
   const [autoNotify, setAutoNotify] = useState(() => localStorage.getItem('pushover-autonotify') === 'true');
   const [notifyTime, setNotifyTime] = useState(() => localStorage.getItem('pushover-notifytime') || '18:00');
 
-  // Input states for dynamically adding projects and tasks (we simply key them by parent ID)
+  // Input states for dynamically adding sub-tier items
   const [newProjectInputs, setNewProjectInputs] = useState({});
   const [newTaskInputs, setNewTaskInputs] = useState({});
+  const [newSubtaskInputs, setNewSubtaskInputs] = useState({});
 
   const companiesRef = useRef(companies);
 
@@ -118,8 +119,8 @@ function App() {
                id: 'p1',
                name: 'Controller Board V2',
                tasks: [
-                 { id: 't1', title: 'Review schematic', done: false, notify: true },
-                 { id: 't2', title: 'Order components batch', done: false, notify: false }
+                 { id: 't1', title: 'Review schematic', done: false, notify: true, subtasks: [] },
+                 { id: 't2', title: 'Order components batch', done: false, notify: false, subtasks: [] }
                ]
              }]
            }
@@ -148,14 +149,27 @@ function App() {
       let companyMessage = "";
 
       company.projects.forEach(project => {
-        const pendingNotifiable = project.tasks.filter(t => !t.done && t.notify);
-        if (pendingNotifiable.length > 0) {
+        let projectTasksLog = "";
+        
+        project.tasks.forEach(task => {
+          if (!task.done && task.notify) {
+            projectTasksLog += `   - ${task.title}\n`;
+            notifiableCount++;
+          }
+          
+          if (task.subtasks) {
+            task.subtasks.forEach(sub => {
+              if (!sub.done && sub.notify) {
+                projectTasksLog += `      * [Sub] ${sub.title}\n`;
+                notifiableCount++;
+              }
+            });
+          }
+        });
+
+        if (projectTasksLog) {
           companyHasTasks = true;
-          notifiableCount += pendingNotifiable.length;
-          companyMessage += ` [Project] ${project.name}:\n`;
-          pendingNotifiable.forEach(task => {
-            companyMessage += `   - ${task.title}\n`;
-          });
+          companyMessage += ` [Project] ${project.name}:\n` + projectTasksLog;
         }
       });
 
@@ -182,7 +196,7 @@ function App() {
       formData.append("token", pushoverToken);
       formData.append("user", pushoverUser);
       formData.append("message", messageString.trim());
-      formData.append("title", "Engineer Tasks Summary");
+      formData.append("title", "Mesomo Task Manager Summary");
       
       await fetch('https://api.pushover.net/1/messages.json', {
         method: 'POST',
@@ -217,7 +231,7 @@ function App() {
           localStorage.setItem('pushover-lastsent-date', todayStr);
         }
       }
-    }, 60000); // Check every minute
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [autoNotify, notifyTime, pushoverToken, pushoverUser]);
@@ -272,7 +286,8 @@ function App() {
                   id: 't_' + Date.now(),
                   title: taskTitle.trim(),
                   done: false,
-                  notify: true
+                  notify: true,
+                  subtasks: []
                 }]
               };
             }
@@ -284,6 +299,44 @@ function App() {
     }));
 
     setNewTaskInputs(prev => ({...prev, [projectId]: ''}));
+  };
+
+  const handleAddSubSubtask = (companyId, projectId, taskId) => {
+    const subTitle = newSubtaskInputs[taskId];
+    if (!subTitle || !subTitle.trim()) return;
+
+    setCompanies(companies.map(c => {
+      if (c.id === companyId) {
+        return {
+          ...c,
+          projects: c.projects.map(p => {
+            if (p.id === projectId) {
+              return {
+                ...p,
+                tasks: p.tasks.map(t => {
+                  if (t.id === taskId) {
+                    return {
+                      ...t,
+                      subtasks: [...(t.subtasks || []), {
+                        id: 'ss_' + Date.now(),
+                        title: subTitle.trim(),
+                        done: false,
+                        notify: false 
+                      }]
+                    }
+                  }
+                  return t;
+                })
+              };
+            }
+            return p;
+          })
+        };
+      }
+      return c;
+    }));
+
+    setNewSubtaskInputs(prev => ({...prev, [taskId]: ''}));
   };
 
   const toggleTaskDone = (companyId, projectId, taskId) => {
@@ -306,12 +359,51 @@ function App() {
     } : c));
   };
 
+  const toggleSubtaskDone = (companyId, projectId, taskId, subtaskId) => {
+    setCompanies(companies.map(c => c.id === companyId ? {
+      ...c,
+      projects: c.projects.map(p => p.id === projectId ? {
+        ...p,
+        tasks: p.tasks.map(t => t.id === taskId ? {
+          ...t,
+          subtasks: (t.subtasks || []).map(s => s.id === subtaskId ? { ...s, done: !s.done } : s)
+        } : t)
+      } : p)
+    } : c));
+  };
+
+  const toggleSubtaskNotify = (companyId, projectId, taskId, subtaskId) => {
+    setCompanies(companies.map(c => c.id === companyId ? {
+      ...c,
+      projects: c.projects.map(p => p.id === projectId ? {
+        ...p,
+        tasks: p.tasks.map(t => t.id === taskId ? {
+          ...t,
+          subtasks: (t.subtasks || []).map(s => s.id === subtaskId ? { ...s, notify: !s.notify } : s)
+        } : t)
+      } : p)
+    } : c));
+  };
+
   const deleteTask = (companyId, projectId, taskId) => {
     setCompanies(companies.map(c => c.id === companyId ? {
       ...c,
       projects: c.projects.map(p => p.id === projectId ? {
         ...p,
         tasks: p.tasks.filter(t => t.id !== taskId)
+      } : p)
+    } : c));
+  };
+
+  const deleteSubtask = (companyId, projectId, taskId, subtaskId) => {
+    setCompanies(companies.map(c => c.id === companyId ? {
+      ...c,
+      projects: c.projects.map(p => p.id === projectId ? {
+        ...p,
+        tasks: p.tasks.map(t => t.id === taskId ? {
+          ...t,
+          subtasks: (t.subtasks || []).filter(s => s.id !== subtaskId)
+        } : t)
       } : p)
     } : c));
   };
@@ -332,6 +424,11 @@ function App() {
     c.projects.forEach(p => {
       p.tasks.forEach(t => {
         if (!t.done && t.notify) totalNotifiable++;
+        if (t.subtasks) {
+          t.subtasks.forEach(s => {
+            if (!s.done && s.notify) totalNotifiable++;
+          });
+        }
       });
     });
   });
@@ -341,7 +438,7 @@ function App() {
       <div className="animate-fade-in glass-panel main-panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1>Engineer Tasks</h1>
+            <h1>Mesomo Task Manager</h1>
             <p className="subtitle">Manage constraints, components, and clients.</p>
           </div>
           <button 
@@ -412,7 +509,7 @@ function App() {
                     <input 
                       type="text" 
                       className="hierarchy-input-sm" 
-                      placeholder="New Subtask..." 
+                      placeholder="New Task..." 
                       value={newTaskInputs[project.id] || ''}
                       onChange={(e) => setNewTaskInputs({...newTaskInputs, [project.id]: e.target.value})}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubtask(company.id, project.id); } }}
@@ -427,37 +524,74 @@ function App() {
                 </div>
 
                 {project.tasks.map(task => (
-                  <div key={task.id} className={`task-item ${task.done ? 'completed' : ''}`}>
-                    <label className="checkbox-wrapper">
-                      <input 
-                        type="checkbox" 
-                        className="checkbox-input"
-                        checked={task.done}
-                        onChange={() => toggleTaskDone(company.id, project.id, task.id)}
-                      />
-                      <div className="checkbox-custom"></div>
-                    </label>
-                    
-                    <div className="task-content">
-                      <div className="task-title">{task.title}</div>
-                      <div className="task-meta">
-                        <div 
-                          className={`notify-toggle ${task.notify ? 'active' : ''}`}
-                          onClick={() => toggleTaskNotify(company.id, project.id, task.id)}
-                        >
-                          <BellIcon className="notify-icon" />
-                          {task.notify ? 'Include in Notify' : 'No Notify'}
+                  <div key={task.id} className="task-container animate-slide-in">
+                    <div className={`task-item ${task.done ? 'completed' : ''}`}>
+                      <label className="checkbox-wrapper">
+                        <input 
+                          type="checkbox" 
+                          className="checkbox-input"
+                          checked={task.done}
+                          onChange={() => toggleTaskDone(company.id, project.id, task.id)}
+                        />
+                        <div className="checkbox-custom"></div>
+                      </label>
+                      
+                      <div className="task-content">
+                        <div className="task-title">{task.title}</div>
+                        <div className="task-meta">
+                          <div 
+                            className={`notify-toggle ${task.notify ? 'active' : ''}`}
+                            onClick={() => toggleTaskNotify(company.id, project.id, task.id)}
+                          >
+                            <BellIcon className="notify-icon" />
+                            {task.notify ? 'Include in Notify' : 'No Notify'}
+                          </div>
                         </div>
                       </div>
+                      
+                      <div className="inline-form" style={{marginRight: '0.5rem'}}>
+                         <input 
+                            className="hierarchy-input-micro" 
+                            placeholder="Add sub-task..." 
+                            value={newSubtaskInputs[task.id] || ''}
+                            onChange={(e) => setNewSubtaskInputs({...newSubtaskInputs, [task.id]: e.target.value})}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSubSubtask(company.id, project.id, task.id); } }}
+                         />
+                         <button className="hierarchy-add-btn" style={{padding: '0.35rem 0.6rem'}} onClick={() => handleAddSubSubtask(company.id, project.id, task.id)}>
+                            <PlusIcon style={{width: '14px', height: '14px'}} />
+                         </button>
+                      </div>
+
+                      <button 
+                        className="btn-icon" 
+                        onClick={() => deleteTask(company.id, project.id, task.id)}
+                        title="Delete Task"
+                      >
+                        <TrashIcon style={{width: '20px', height: '20px'}} />
+                      </button>
                     </div>
-                    
-                    <button 
-                      className="btn-icon" 
-                      onClick={() => deleteTask(company.id, project.id, task.id)}
-                      title="Delete Subtask"
-                    >
-                      <TrashIcon style={{width: '20px', height: '20px'}} />
-                    </button>
+
+                    {task.subtasks && task.subtasks.length > 0 && (
+                      <div className="subtask-group animate-slide-in">
+                        {task.subtasks.map(sub => (
+                          <div key={sub.id} className={`subtask-item ${sub.done ? 'completed' : ''}`}>
+                             <label className="checkbox-wrapper" style={{width: '18px', height: '18px', display: 'flex'}}>
+                               <input type="checkbox" className="checkbox-input" checked={sub.done} onChange={() => toggleSubtaskDone(company.id, project.id, task.id, sub.id)} />
+                               <div className="checkbox-custom" style={{borderWidth: '1px'}}></div>
+                             </label>
+                             <div className="subtask-title">{sub.title}</div>
+                             
+                             <div className={`notify-toggle ${sub.notify ? 'active' : ''}`} onClick={() => toggleSubtaskNotify(company.id, project.id, task.id, sub.id)} style={{padding: '0.15rem 0.35rem', fontSize: '0.75rem'}}>
+                               <BellIcon className="notify-icon" style={{width: '14px', height: '14px'}} />
+                             </div>
+                             
+                             <button className="btn-icon" style={{padding: '0.25rem'}} onClick={() => deleteSubtask(company.id, project.id, task.id, sub.id)}>
+                               <TrashIcon style={{width: '16px', height: '16px'}} />
+                             </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -467,7 +601,7 @@ function App() {
 
         <div className="summary-action">
           <div className="summary-info">
-            <p><span>{totalNotifiable}</span> tasks marked for notification</p>
+            <p><span>{totalNotifiable}</span> tasks/subtasks marked for notification</p>
           </div>
           <button 
             className="btn-primary" 
