@@ -84,6 +84,7 @@ function App() {
   const [newProjectInputs, setNewProjectInputs] = useState({});
   const [newTaskInputs, setNewTaskInputs] = useState({});
   const [newSubtaskInputs, setNewSubtaskInputs] = useState({});
+  const [cloudStatus, setCloudStatus] = useState('');
 
   const companiesRef = useRef(companies);
 
@@ -103,14 +104,24 @@ function App() {
     if (isLoadingKV) return;
     
     const timeout = setTimeout(async () => {
+       setCloudStatus('Syncing to Cloud...');
        try {
-         await fetch('/api/saveTasks', {
+         const res = await fetch('/api/saveTasks', {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({ companies })
          });
+         
+         if (!res.ok) {
+           const errData = await res.json();
+           throw new Error(errData.error || `HTTP ${res.status}`);
+         }
+         
+         setCloudStatus('Cloud Saved ✅');
+         setTimeout(() => setCloudStatus(''), 4000);
        } catch (e) {
-         console.warn("Failed to sync to cloud. The app is still working via local storage.", e);
+         console.warn("Cloud Sync Failed. Using Local Storage.", e);
+         setCloudStatus('Sync Failed ❌');
        }
     }, 1500);
 
@@ -352,7 +363,7 @@ function App() {
                         id: 'ss_' + Date.now(),
                         title: subTitle.trim(),
                         done: false,
-                        notify: false,
+                        notify: true,
                         priority: 'none',
                         deadline: ''
                       }]
@@ -467,7 +478,17 @@ function App() {
       <div className="animate-fade-in glass-panel main-panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1>Mesomo Task Manager</h1>
+            <h1 style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+              Mesomo Task Manager
+              {cloudStatus && (
+                <span 
+                  style={{fontSize: '0.8rem', padding: '0.25rem 0.5rem', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', color: cloudStatus.includes('❌') ? 'var(--accent-danger)' : 'var(--accent-success)', whiteSpace: 'nowrap', fontWeight: '500', cursor: 'help'}}
+                  title={cloudStatus.includes('❌') ? "Storage Database is detached! Go to Vercel and link Upstash Redis..." : "Live updating into Database via Serverless API"}
+                >
+                  {cloudStatus}
+                </span>
+              )}
+            </h1>
             <p className="subtitle">Manage constraints, components, and clients.</p>
           </div>
           <div style={{display: 'flex', gap: '0.5rem'}}>
