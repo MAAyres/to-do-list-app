@@ -390,3 +390,91 @@ h2 {
   position: relative;
   z-index: 10;
 }
+
+/* Hierarchy Additions */
+.company-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.company-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.project-group {
+  margin-left: 1.5rem;
+  padding-left: 1.5rem;
+  border-left: 2px solid rgba(139, 92, 246, 0.3);
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.project-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.hierarchy-input-sm {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  min-width: 200px;
+}
+
+.hierarchy-input-sm:focus {
+  border-color: var(--border-focus);
+}
+
+.hierarchy-add-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hierarchy-add-btn:hover {
+  background: var(--accent-primary);
+}
+
+.settings-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  margin-top: 1rem;
+}
+
+.inline-form {
+  display: flex;
+  gap: 0.5rem;
+}
