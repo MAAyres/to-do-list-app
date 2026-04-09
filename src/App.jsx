@@ -121,7 +121,7 @@ function App() {
          setTimeout(() => setCloudStatus(''), 4000);
        } catch (e) {
          console.warn("Cloud Sync Failed. Using Local Storage.", e);
-         setCloudStatus('Sync Failed ❌');
+         setCloudStatus(`Sync Failed ❌: ${e.message}`);
        }
     }, 1500);
 
@@ -171,7 +171,7 @@ function App() {
 
     fetchRemoteTasks();
     return () => { isMounted = false; };
-  }, [companies.length]);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('pushover-token', pushoverToken);
@@ -482,8 +482,9 @@ function App() {
               Mesomo Task Manager
               {cloudStatus && (
                 <span 
-                  style={{fontSize: '0.8rem', padding: '0.25rem 0.5rem', borderRadius: '12px', background: 'rgba(255,255,255,0.05)', color: cloudStatus.includes('❌') ? 'var(--accent-danger)' : 'var(--accent-success)', whiteSpace: 'nowrap', fontWeight: '500', cursor: 'help'}}
-                  title={cloudStatus.includes('❌') ? "Storage Database is detached! Go to Vercel and link Upstash Redis..." : "Live updating into Database via Serverless API"}
+                  style={{fontSize: '0.75rem', padding: '0.35rem 0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: cloudStatus.includes('❌') ? 'var(--accent-danger)' : 'var(--accent-success)', fontWeight: '500', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'help'}}
+                  title={cloudStatus}
+                  onClick={() => alert(`Status Log: ${cloudStatus}`)}
                 >
                   {cloudStatus}
                 </span>
