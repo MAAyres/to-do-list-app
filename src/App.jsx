@@ -46,7 +46,14 @@ const BuildingOfficeIcon = ({ className, style }) => (
 );
 
 function App() {
-  const [companies, setCompanies] = useState([]);
+  const [companies, setCompanies] = useState(() => {
+    try {
+      const saved = localStorage.getItem('engineer-companies');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
+  
   const [isLoadingKV, setIsLoadingKV] = useState(true);
 
   const [newCompanyName, setNewCompanyName] = useState('');
