@@ -46,51 +46,8 @@ const BuildingOfficeIcon = ({ className, style }) => (
 );
 
 function App() {
-  const [companies, setCompanies] = useState(() => {
-    const savedCompanies = localStorage.getItem('engineer-companies');
-    if (savedCompanies) return JSON.parse(savedCompanies);
-
-    // Migration from old basic flat tasks
-    const legacyTasksStr = localStorage.getItem('engineer-tasks');
-    if (legacyTasksStr) {
-      const legacyTasks = JSON.parse(legacyTasksStr);
-      if (Array.isArray(legacyTasks) && legacyTasks.length > 0) {
-        const migrated = [];
-        const clientNames = [...new Set(legacyTasks.map(t => t.client || 'General Client'))];
-        
-        clientNames.forEach(cName => {
-          const clientTasks = legacyTasks.filter(t => (t.client || 'General Client') === cName);
-          migrated.push({
-            id: 'c_' + Math.random().toString(36).substr(2, 9),
-            name: cName,
-            projects: [{
-              id: 'p_' + Math.random().toString(36).substr(2, 9),
-              name: 'General Project',
-              tasks: clientTasks.map(t => ({...t}))
-            }]
-          });
-        });
-        return migrated;
-      }
-    }
-
-    return [
-      {
-        id: 'c1',
-        name: 'Acme Corp',
-        projects: [
-          {
-            id: 'p1',
-            name: 'Controller Board V2',
-            tasks: [
-              { id: 't1', title: 'Review schematic', done: false, notify: true },
-              { id: 't2', title: 'Order components batch', done: false, notify: false }
-            ]
-          }
-        ]
-      }
-    ];
-  });
+  const [companies, setCompanies] = useState([]);
+  const [isLoadingKV, setIsLoadingKV] = useState(true);
 
   const [newCompanyName, setNewCompanyName] = useState('');
   
@@ -110,8 +67,70 @@ function App() {
   // Sync refs to state for interval
   useEffect(() => {
     companiesRef.current = companies;
+    // We keep local storage sync as a reliable offline browser cache
     localStorage.setItem('engineer-companies', JSON.stringify(companies));
-  }, [companies]);
+
+    // Debounce the API push to respect Vercel Serverless/KV limits
+    if (isLoadingKV) return;
+    
+    const timeout = setTimeout(async () => {
+       try {
+         await fetch('/api/saveTasks', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ companies })
+         });
+       } catch (e) {
+         console.warn("Failed to sync to cloud. The app is still working via local storage.", e);
+       }
+    }, 1500);
+
+    return () => clearTimeout(timeout);
+  }, [companies, isLoadingKV]);
+
+  // Initial Fetch Mount
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRemoteTasks = async () => {
+      try {
+        const response = await fetch('/api/getTasks');
+        if (response.ok) {
+           const data = await response.json();
+           if (data.companies && Array.isArray(data.companies) && isMounted) {
+             setCompanies(data.companies);
+             setIsLoadingKV(false);
+             return;
+           }
+        }
+      } catch (e) {
+        console.warn("Could not fetch remote tasks, falling back to local...", e);
+      }
+      
+      const savedCompanies = localStorage.getItem('engineer-companies');
+      if (savedCompanies && isMounted) {
+         setCompanies(JSON.parse(savedCompanies));
+      } else if (isMounted) {
+         setCompanies([
+           {
+             id: 'c1',
+             name: 'Acme Corp',
+             projects: [{
+               id: 'p1',
+               name: 'Controller Board V2',
+               tasks: [
+                 { id: 't1', title: 'Review schematic', done: false, notify: true },
+                 { id: 't2', title: 'Order components batch', done: false, notify: false }
+               ]
+             }]
+           }
+         ]);
+      }
+      if (isMounted) setIsLoadingKV(false);
+    };
+
+    fetchRemoteTasks();
+    return () => { isMounted = false; };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('pushover-token', pushoverToken);
