@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './index.css';
+import appLogo from './assets/app_icon.png';
 
 // SVG Icons
 const BellIcon = ({ className, style }) => (
@@ -59,6 +60,12 @@ const SunIcon = ({ className, style }) => (
 
 
 function App() {
+  const [sessionToken, setSessionToken] = useState(() => localStorage.getItem('mesomo-session') || '');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
   const [theme, setTheme] = useState(() => localStorage.getItem('engineer-theme') || 'dark');
 
   const [companies, setCompanies] = useState(() => {
@@ -108,10 +115,18 @@ function App() {
        try {
          const res = await fetch('/api/saveTasks', {
            method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
+           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
            body: JSON.stringify({ companies })
          });
          
+         if (res.status === 401) {
+           setIsLoggedIn(false);
+           setSessionToken('');
+           localStorage.removeItem('mesomo-session');
+           setCloudStatus('Session expired. Please log in again.');
+           return;
+         }
+
          if (!res.ok) {
            const errData = await res.json();
            throw new Error(errData.error || `HTTP ${res.status}`);
@@ -130,14 +145,31 @@ function App() {
 
   // Initial Fetch Mount
   useEffect(() => {
+    if (!sessionToken) {
+      setIsLoadingKV(false);
+      return;
+    }
+
     let isMounted = true;
     const fetchRemoteTasks = async () => {
       try {
-        const response = await fetch('/api/getTasks');
+        const response = await fetch('/api/getTasks', {
+          headers: { 'Authorization': `Bearer ${sessionToken}` }
+        });
+        
+        if (response.status === 401) {
+          setIsLoggedIn(false);
+          setSessionToken('');
+          localStorage.removeItem('mesomo-session');
+          if (isMounted) setIsLoadingKV(false);
+          return;
+        }
+
         if (response.ok) {
            const data = await response.json();
            if (data.companies && Array.isArray(data.companies) && isMounted) {
              setCompanies(data.companies);
+             setIsLoggedIn(true);
              setIsLoadingKV(false);
              return;
            }
@@ -146,32 +178,20 @@ function App() {
         console.warn("Could not fetch remote tasks, falling back to local...", e);
       }
       
+      // Fallback to local storage
       const savedCompanies = localStorage.getItem('engineer-companies');
       if (savedCompanies && isMounted) {
          setCompanies(JSON.parse(savedCompanies));
-      } else if (isMounted && companies.length === 0) {
-         // Default Demo Board 
-         setCompanies([
-           {
-             id: 'c1',
-             name: 'Acme Corp',
-             projects: [{
-               id: 'p1',
-               name: 'Controller Board V2',
-               tasks: [
-                 { id: 't1', title: 'Review schematic', done: false, notify: true, subtasks: [], priority: 'high', deadline: '' },
-                 { id: 't2', title: 'Order components batch', done: false, notify: false, subtasks: [], priority: 'low', deadline: '' }
-               ]
-             }]
-           }
-         ]);
       }
-      if (isMounted) setIsLoadingKV(false);
+      if (isMounted) {
+        setIsLoggedIn(true);
+        setIsLoadingKV(false);
+      }
     };
 
     fetchRemoteTasks();
     return () => { isMounted = false; };
-  }, []);
+  }, [sessionToken]);
 
   useEffect(() => {
     localStorage.setItem('pushover-token', pushoverToken);
@@ -182,6 +202,42 @@ function App() {
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+    
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: loginPassword })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setLoginError(data.error || 'Login failed.');
+        setLoginLoading(false);
+        return;
+      }
+      
+      localStorage.setItem('mesomo-session', data.token);
+      setSessionToken(data.token);
+      setLoginPassword('');
+      setLoginLoading(false);
+    } catch (err) {
+      setLoginError('Could not reach the server.');
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setSessionToken('');
+    setIsLoggedIn(false);
+    localStorage.removeItem('mesomo-session');
   };
 
   const handleSendPushover = async (isAuto = false) => {
@@ -473,24 +529,61 @@ function App() {
     });
   });
 
+  if (!isLoggedIn) {
+    return (
+      <>
+        <div className="animate-fade-in glass-panel main-panel" style={{maxWidth: '420px', margin: '10vh auto', textAlign: 'center'}}>
+          <img src={appLogo} alt="Mesomo" style={{width: '80px', height: '80px', borderRadius: '20px', marginBottom: '1.5rem', boxShadow: 'var(--shadow-glow)'}} />
+          <h1 style={{fontSize: '1.8rem', marginBottom: '0.25rem'}}>Mesomo</h1>
+          <p className="subtitle" style={{marginBottom: '2rem'}}>Sign in to manage your tasks</p>
+          
+          <form onSubmit={handleLogin}>
+            <input 
+              type="password" 
+              className="input-field" 
+              style={{width: '100%', marginBottom: '1rem', textAlign: 'center'}}
+              placeholder="Enter your password" 
+              value={loginPassword}
+              onChange={e => setLoginPassword(e.target.value)}
+              autoFocus
+            />
+            {loginError && <p style={{color: 'var(--accent-danger)', fontSize: '0.85rem', marginBottom: '1rem'}}>{loginError}</p>}
+            <button type="submit" className="btn-primary" style={{width: '100%', justifyContent: 'center'}} disabled={loginLoading}>
+              {loginLoading ? 'Signing in...' : 'Sign In'}
+            </button>
+          </form>
+          
+          <div style={{marginTop: '1.5rem'}}>
+            <button className="theme-toggle" onClick={toggleTheme} style={{margin: '0 auto'}}>
+              {theme === 'dark' ? <SunIcon style={{width: '20px', height: '20px'}} /> : <MoonIcon style={{width: '20px', height: '20px'}} />}
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <div className="animate-fade-in glass-panel main-panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h1 style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
-              Mesomo Task Manager
-              {cloudStatus && (
-                <span 
-                  style={{fontSize: '0.75rem', padding: '0.35rem 0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: cloudStatus.includes('❌') ? 'var(--accent-danger)' : 'var(--accent-success)', fontWeight: '500', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'help'}}
-                  title={cloudStatus}
-                  onClick={() => alert(`Status Log: ${cloudStatus}`)}
-                >
-                  {cloudStatus}
-                </span>
-              )}
-            </h1>
-            <p className="subtitle">Manage constraints, components, and clients.</p>
+          <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+            <img src={appLogo} alt="Mesomo" style={{width: '48px', height: '48px', borderRadius: '12px'}} />
+            <div>
+              <h1 style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                Mesomo Task Manager
+                {cloudStatus && (
+                  <span 
+                    style={{fontSize: '0.75rem', padding: '0.35rem 0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', color: cloudStatus.includes('❌') ? 'var(--accent-danger)' : 'var(--accent-success)', fontWeight: '500', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'help'}}
+                    title={cloudStatus}
+                    onClick={() => alert(`Status Log: ${cloudStatus}`)}
+                  >
+                    {cloudStatus}
+                  </span>
+                )}
+              </h1>
+              <p className="subtitle" style={{marginBottom: 0}}>Manage constraints, components, and clients.</p>
+            </div>
           </div>
           <div style={{display: 'flex', gap: '0.5rem'}}>
             <button 
@@ -506,6 +599,14 @@ function App() {
               onClick={() => setShowSettings(true)}
             >
               <CogIcon style={{width: '24px', height: '24px'}} />
+            </button>
+            <button 
+              className="theme-toggle" 
+              title="Logout" 
+              onClick={handleLogout}
+              style={{color: 'var(--accent-danger)'}}
+            >
+              ⭕
             </button>
           </div>
         </div>
