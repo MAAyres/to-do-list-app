@@ -27,6 +27,18 @@
   background-color: var(--bg-grad-1);
 }
 
+:root[data-theme="light"] {
+  --bg-grad-1: #f8fafc;
+  --bg-grad-2: #e2e8f0;
+  --panel-bg: rgba(255, 255, 255, 0.85);
+  --border-color: rgba(0, 0, 0, 0.1);
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --input-bg: rgba(255, 255, 255, 0.6);
+  --item-bg: rgba(0, 0, 0, 0.02);
+  --item-bg-hover: rgba(0, 0, 0, 0.05);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -545,4 +557,65 @@ h2 {
   font-size: 0.8rem;
   outline: none;
   min-width: 120px;
+}
+
+/* Feature Overrides */
+.priority-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  background-color: var(--border-color);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.priority-dot[data-priority="low"] {
+  background-color: var(--accent-success);
+  border-color: var(--accent-success);
+}
+.priority-dot[data-priority="medium"] {
+  background-color: #f59e0b;
+  border-color: #f59e0b;
+}
+.priority-dot[data-priority="high"] {
+  background-color: var(--accent-danger);
+  border-color: var(--accent-danger);
+}
+.priority-dot:hover {
+  transform: scale(1.15);
+}
+
+.deadline-input {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-color);
+  font-family: inherit;
+  font-size: 0.75rem;
+  border-radius: 6px;
+  padding: 0.15rem 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.deadline-input:hover, .deadline-input:focus {
+  background: var(--input-bg);
+  border-color: var(--border-focus);
+  color: var(--text-main);
+  outline: none;
+}
+
+.theme-toggle {
+  background: rgba(128, 128, 128, 0.1);
+  padding: 0.75rem;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  color: var(--text-main);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.theme-toggle:hover {
+  background: rgba(128, 128, 128, 0.2);
 }
